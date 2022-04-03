@@ -2,11 +2,13 @@ package otellog_test
 
 import (
 	"encoding/json"
-	log "github.com/d-velop/dvelop-sdk-go/otellog"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	log "github.com/d-velop/dvelop-sdk-go/otellog"
 )
 
 func TestEventWithStringBody_Marshal_BodyPropertyIsString(t *testing.T) {
@@ -227,4 +229,53 @@ func normalizeJsonString(s string) string {
 	s = strings.ReplaceAll(s, " ", "")
 	s = strings.ReplaceAll(s, "\t", "")
 	return s
+}
+
+type CustomAttributes struct {
+	A string `json:"a"`
+	B string `json:"b"`
+	C string `json:"c"`
+}
+
+func TestOverwriteAttributes(t *testing.T) {
+
+	attr := log.Attributes{Http: &log.Http{Host: "testhost"}}
+	customAttr := CustomAttributes{
+		A: "1",
+		B: "2",
+		C: "3",
+	}
+	attr.OverwriteAttributes(func() interface{} {
+		type AliasAttribute log.Attributes
+		type AliasCustomAttributes CustomAttributes
+		return struct {
+			AliasAttribute
+			AliasCustomAttributes
+		}{
+			AliasAttribute:        AliasAttribute(attr),
+			AliasCustomAttributes: AliasCustomAttributes(customAttr),
+		}
+	})
+
+	bytes, err := json.Marshal(attr)
+	if err != nil {
+		return
+	}
+	actualJsonString := string(bytes)
+
+	if !(strings.Contains(actualJsonString, attrStr("a", "1")) &&
+		strings.Contains(actualJsonString, attrStr("b", "2")) &&
+		strings.Contains(actualJsonString, attrStr("c", "3")) &&
+		strings.Contains(actualJsonString, attrStr("host", "testhost"))) {
+		t.Errorf("%s does not contain wanted attributes: %s, %s, %s, %s",
+			actualJsonString,
+			attrStr("a", "1"),
+			attrStr("b", "2"),
+			attrStr("c", "3"),
+			attrStr("host", "testhost"))
+	}
+}
+
+func attrStr(name string, value string) string {
+	return fmt.Sprintf("\"%s\":\"%s\"", name, value)
 }

@@ -36,6 +36,7 @@ type Attributes struct {
 	Http      *Http      `json:"http,omitempty"`      // Information about outbound or inbound http requests.
 	DB        *DB        `json:"db,omitempty"`        // Information about outbound db requests.
 	Exception *Exception `json:"exception,omitempty"` // Information about an exception
+	custom    func() interface{}
 }
 
 // Http contains information about outbound or inbound HTTP requests
@@ -75,6 +76,21 @@ type Exception struct {
 	Type       string `json:"type,omitempty"`       // The type of the exception (its fully-qualified class name, if applicable). The dynamic type of the exception should be preferred over the static type in languages that support it. For example java.net.ConnectException; OSError
 	Message    string `json:"message,omitempty"`    // The exception message. For example Division by zero
 	Stacktrace string `json:"stacktrace,omitempty"` // A stacktrace as a string in the natural representation for the language runtime.
+}
+
+func (attr *Attributes) OverwriteAttributes(fn func() interface{}) {
+	attr.custom = fn
+}
+
+func (attr Attributes) MarshalJSON() ([]byte, error) {
+	type Alias Attributes
+	if attr.custom == nil {
+		attr.custom = func() interface{} { return Alias(attr) }
+	} else {
+
+	}
+
+	return json.Marshal(attr.custom())
 }
 
 // MarshalJSON customizes the JSON Representation of the Event type
